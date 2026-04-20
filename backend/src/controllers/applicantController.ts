@@ -386,32 +386,85 @@ export const applyForJob = async (req: Request, res: Response): Promise<void> =>
 
     // Support both old and new schema formats
     const body = req.body;
+    console.log('[Apply] Request body:', JSON.stringify(body, null, 2));
+    
+    // Sanitize experience data - remove entries missing required fields
+    const sanitizeExperience = (exp: any[]) => {
+      if (!Array.isArray(exp)) return [];
+      return exp.filter((e: any) => e && e.company && e.company.trim() && e.role && e.role.trim() && e.startDate)
+        .map((e: any) => ({
+          company: e.company.trim(),
+          role: e.role.trim(),
+          startDate: e.startDate,
+          endDate: e.endDate || '',
+          description: e.description || '',
+          technologies: Array.isArray(e.technologies) ? e.technologies : [],
+          isCurrent: !!e.isCurrent
+        }));
+    };
+
+    // Sanitize education data - remove entries missing required fields
+    const sanitizeEducation = (edu: any[]) => {
+      if (!Array.isArray(edu)) return [];
+      return edu.filter((e: any) => e && e.institution && e.institution.trim() && e.degree && e.degree.trim() && 
+        e.fieldOfStudy && e.fieldOfStudy.trim() && e.startYear)
+        .map((e: any) => ({
+          institution: e.institution.trim(),
+          degree: e.degree.trim(),
+          fieldOfStudy: e.fieldOfStudy.trim(),
+          startYear: Number(e.startYear) || new Date().getFullYear(),
+          endYear: e.endYear ? Number(e.endYear) : undefined
+        }));
+    };
+
+    // Sanitize skills
+    const sanitizeSkills = (skills: any[]) => {
+      if (!Array.isArray(skills)) return [];
+      return skills.filter((s: any) => s && s.name && s.name.trim())
+        .map((s: any) => ({
+          name: s.name.trim(),
+          level: ['Beginner', 'Intermediate', 'Advanced', 'Expert'].includes(s.level) ? s.level : 'Intermediate',
+          yearsOfExperience: Number(s.yearsOfExperience) || 0
+        }));
+    };
     
     // Map to Talent Profile Schema
     const talentProfile = mapToTalentProfile(body) || {
-      firstName: body.name?.split(' ')[0] || 'Unknown',
-      lastName: body.name?.split(' ').slice(1).join(' ') || 'Candidate',
+      firstName: body.firstName || body.name?.split(' ')[0] || 'Unknown',
+      lastName: body.lastName || body.name?.split(' ').slice(1).join(' ') || 'Candidate',
       email: body.email || 'no-email@example.com',
       headline: body.headline || 'Professional',
       location: body.location || 'Remote',
       phone: body.phone || '',
       bio: body.bio || body.resumeText || '',
-      skills: parseList(body.skills).map((name: string) => ({ name, level: 'Intermediate', yearsOfExperience: 0 })),
+      skills: sanitizeSkills(body.skills),
       languages: [],
-      experience: body.experience || [],
-      education: body.education || [],
+      experience: sanitizeExperience(body.experience),
+      education: sanitizeEducation(body.education),
       certifications: [],
       projects: [],
       availability: { status: 'Available', type: 'Full-time' },
       socialLinks: {}
     };
 
-    const applicant = await Applicant.create({
+    console.log('[Apply] Sanitized talentProfile:', JSON.stringify(talentProfile, null, 2));
+
+    // Ensure required fields are present
+    if (!talentProfile.firstName || !talentProfile.email) {
+      res.status(400).json({ message: 'First name and email are required' });
+      return;
+    }
+
+    const applicantData = {
       jobId,
       userId,
       ...talentProfile,
       structuredData: body,
-    });
+    };
+
+    console.log('[Apply] Creating applicant with data:', JSON.stringify(applicantData, null, 2));
+
+    const applicant = await Applicant.create(applicantData);
 
     res.status(201).json({ message: 'Application submitted successfully', applicant });
   } catch (error: any) {
