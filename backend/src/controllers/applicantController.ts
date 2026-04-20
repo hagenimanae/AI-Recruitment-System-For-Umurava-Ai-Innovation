@@ -5,6 +5,13 @@ import Job from '../models/Job';
 import { Readable } from 'stream';
 import multer from 'multer';
 
+// Mock fs before requiring pdf-parse to prevent test file loading issues
+const mockFs = {
+  readFileSync: () => Buffer.from(''),
+  existsSync: () => false
+};
+(require as any)('module')._cache[require.resolve('fs')] = { exports: mockFs };
+
 const pdfParse = require('pdf-parse');
 const csvParser = require('csv-parser');
 
@@ -128,12 +135,34 @@ const mapToTalentProfile = (profile: any): any => {
 
 const extractPdfText = async (buffer: Buffer): Promise<string> => {
   try {
+    console.log('[PDF] Starting PDF parsing, buffer size:', buffer.length);
+    
+    // Validate buffer is not empty
+    if (!buffer || buffer.length === 0) {
+      console.error('[PDF] Empty buffer received');
+      return 'Error: Empty PDF file';
+    }
+    
+    // Check PDF magic number (PDF files start with %PDF)
+    const pdfMagic = buffer.slice(0, 4).toString('ascii');
+    if (!pdfMagic.includes('%PDF')) {
+      console.error('[PDF] Invalid PDF format, magic bytes:', pdfMagic);
+      return 'Error: Invalid PDF format';
+    }
+    
     const parsed = await pdfParse(buffer);
-    return typeof parsed?.text === 'string' ? parsed.text : '';
-  } catch (error) {
-    console.error('[PDF Parse Error]', error);
-    // Return empty string or basic message if PDF parsing fails
-    return '';
+    const text = typeof parsed?.text === 'string' ? parsed.text : '';
+    
+    console.log('[PDF] Parsed successfully, text length:', text.length);
+    
+    if (!text || text.trim().length === 0) {
+      return 'Error: PDF contains no extractable text (may be scanned image)';
+    }
+    
+    return text;
+  } catch (error: any) {
+    console.error('[PDF Parse Error]', error?.message || error);
+    return `Error: PDF parsing failed - ${error?.message || 'Unknown error'}`;
   }
 };
 
