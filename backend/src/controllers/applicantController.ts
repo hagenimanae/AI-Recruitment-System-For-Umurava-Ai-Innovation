@@ -5,17 +5,48 @@ import Job from '../models/Job';
 import { Readable } from 'stream';
 import multer from 'multer';
 
-// pdf-parse: handle test file issue by setting env before import
-process.env.PDF_PARSE_DISABLE_TEST = 'true';
-
-let pdfParse: any;
-try {
-  const pdfModule = require('pdf-parse');
-  pdfParse = pdfModule.default || pdfModule;
-} catch (e) {
-  console.error('[PDF] Failed to load pdf-parse:', e);
-  pdfParse = null;
-}
+// Simple PDF text extraction without external dependencies
+const extractPdfTextSimple = (buffer: Buffer): string => {
+  try {
+    const pdfString = buffer.toString('latin1');
+    
+    // Extract text streams - PDF text is typically in (text) format
+    const textParts: string[] = [];
+    
+    // Match text in parentheses: (text)
+    const parenthesisRegex = /\(([^)]{3,500})\)/g;
+    let match;
+    while ((match = parenthesisRegex.exec(pdfString)) !== null) {
+      let text = match[1];
+      // Skip if looks like code/hex/binary
+      if (/^[0-9a-fA-F\s]{10,}$/.test(text)) continue;
+      if (text.includes('obj') || text.includes('endobj')) continue;
+      if (text.includes('<<') || text.includes('>>')) continue;
+      textParts.push(text);
+    }
+    
+    // Also look for TJ and Tj operators which show text positioning
+    const tjMatches = pdfString.match(/TJ\s*\[[^\]]+\]/g);
+    if (tjMatches) {
+      for (const tj of tjMatches) {
+        const innerMatches = tj.match(/\(([^)]+)\)/g);
+        if (innerMatches) {
+          for (const m of innerMatches) {
+            const text = m.slice(1, -1);
+            if (text.length > 2 && !/^[0-9\s]+$/.test(text)) {
+              textParts.push(text);
+            }
+          }
+        }
+      }
+    }
+    
+    const result = textParts.join(' ').replace(/\s+/g, ' ').trim();
+    return result.length > 20 ? result : '';
+  } catch (e) {
+    return '';
+  }
+};
 
 const csvParser = require('csv-parser');
 
@@ -154,52 +185,19 @@ const extractPdfText = async (buffer: Buffer): Promise<string> => {
       return 'Error: Invalid PDF format';
     }
     
-    // If pdf-parse loaded successfully, use it
-    if (pdfParse && typeof pdfParse === 'function') {
-      const parsed = await pdfParse(buffer);
-      const text = typeof parsed?.text === 'string' ? parsed.text : '';
-      console.log('[PDF] Parsed successfully with pdf-parse, text length:', text.length);
-      if (text && text.trim().length > 0) {
-        return text;
-      }
+    // Use simple text extraction (no external dependencies)
+    const text = extractPdfTextSimple(buffer);
+    
+    if (text && text.length > 20) {
+      console.log('[PDF] Extracted text length:', text.length);
+      return text;
     }
     
-    // Fallback: extract text from PDF manually
-    console.log('[PDF] Using fallback text extraction');
-    const pdfString = buffer.toString('utf8');
-    
-    // Extract text between BT (Begin Text) and ET (End Text) operators
-    const textMatches = pdfString.match(/BT\s*([\s\S]*?)\s*ET/g);
-    if (textMatches) {
-      const extractedText = textMatches
-        .map(m => m.replace(/BT|ET/g, '').trim())
-        .join(' ')
-        .replace(/\[?\(([^)]+)\)\]?/g, '$1')
-        .replace(/\\(\d{3})/g, (match, octal) => String.fromCharCode(parseInt(octal, 8)))
-        .replace(/\\n/g, '\n')
-        .replace(/\\r/g, '\r')
-        .replace(/\\t/g, '\t')
-        .replace(/\\\\/g, '\\');
-      
-      if (extractedText.length > 10) {
-        return extractedText;
-      }
-    }
-    
-    // Last resort: extract readable ASCII text
-    const readableText = pdfString
-      .replace(/[^\x20-\x7E\n\r\t]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    
-    if (readableText.length > 50) {
-      return readableText.substring(0, 5000); // Limit length
-    }
-    
+    console.log('[PDF] Limited text extraction, storing for manual review');
     return 'PDF uploaded successfully (text extraction limited). Resume stored for manual review.';
   } catch (error: any) {
     console.error('[PDF Parse Error]', error?.message || error);
-    return `PDF uploaded (parsing error: ${error?.message || 'Unknown error'}). Resume stored.`;
+    return `PDF uploaded (parsing note: ${error?.message || 'extraction limited'}). Resume stored.`;
   }
 };
 
