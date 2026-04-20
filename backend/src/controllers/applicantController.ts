@@ -361,8 +361,13 @@ export const applyForJob = async (req: Request, res: Response): Promise<void> =>
     const { jobId } = req.params;
     const userId = (req as any).user?.userId; // From auth middleware
     
+    console.log('[Apply] JobId:', jobId);
+    console.log('[Apply] User from req:', (req as any).user);
+    console.log('[Apply] UserId:', userId);
+    
     if (!userId) {
-      res.status(401).json({ message: 'Not authenticated' });
+      console.log('[Apply] ERROR: No userId found in request');
+      res.status(401).json({ message: 'Not authenticated. Please login again.' });
       return;
     }
 
@@ -410,7 +415,8 @@ export const applyForJob = async (req: Request, res: Response): Promise<void> =>
 
     res.status(201).json({ message: 'Application submitted successfully', applicant });
   } catch (error: any) {
-    res.status(500).json({ message: 'Failed to submit application', error: error.message });
+    console.error('[Apply] Server error:', error);
+    res.status(500).json({ message: 'Failed to submit application', error: error.message, stack: error.stack });
   }
 };
 
