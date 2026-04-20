@@ -5,49 +5,8 @@ import Job from '../models/Job';
 import { Readable } from 'stream';
 import multer from 'multer';
 
-// Simple PDF text extraction without external dependencies
-const extractPdfTextSimple = (buffer: Buffer): string => {
-  try {
-    const pdfString = buffer.toString('latin1');
-    
-    // Extract text streams - PDF text is typically in (text) format
-    const textParts: string[] = [];
-    
-    // Match text in parentheses: (text)
-    const parenthesisRegex = /\(([^)]{3,500})\)/g;
-    let match;
-    while ((match = parenthesisRegex.exec(pdfString)) !== null) {
-      let text = match[1];
-      // Skip if looks like code/hex/binary
-      if (/^[0-9a-fA-F\s]{10,}$/.test(text)) continue;
-      if (text.includes('obj') || text.includes('endobj')) continue;
-      if (text.includes('<<') || text.includes('>>')) continue;
-      textParts.push(text);
-    }
-    
-    // Also look for TJ and Tj operators which show text positioning
-    const tjMatches = pdfString.match(/TJ\s*\[[^\]]+\]/g);
-    if (tjMatches) {
-      for (const tj of tjMatches) {
-        const innerMatches = tj.match(/\(([^)]+)\)/g);
-        if (innerMatches) {
-          for (const m of innerMatches) {
-            const text = m.slice(1, -1);
-            if (text.length > 2 && !/^[0-9\s]+$/.test(text)) {
-              textParts.push(text);
-            }
-          }
-        }
-      }
-    }
-    
-    const result = textParts.join(' ').replace(/\s+/g, ' ').trim();
-    return result.length > 20 ? result : '';
-  } catch (e) {
-    return '';
-  }
-};
-
+// Import pdf-parse properly
+const pdfParse = require('pdf-parse');
 const csvParser = require('csv-parser');
 
 const safeString = (value: unknown): string => {
@@ -185,19 +144,22 @@ const extractPdfText = async (buffer: Buffer): Promise<string> => {
       return 'Error: Invalid PDF format';
     }
     
-    // Use simple text extraction (no external dependencies)
-    const text = extractPdfTextSimple(buffer);
+    // Use pdf-parse to extract text
+    console.log('[PDF] Calling pdfParse...');
+    const data = await pdfParse(buffer);
+    const text = data?.text || '';
     
-    if (text && text.length > 20) {
-      console.log('[PDF] Extracted text length:', text.length);
+    console.log('[PDF] Extracted text length:', text.length);
+    
+    if (text && text.trim().length > 0) {
       return text;
     }
     
-    console.log('[PDF] Limited text extraction, storing for manual review');
+    console.log('[PDF] No text extracted, storing for manual review');
     return 'PDF uploaded successfully (text extraction limited). Resume stored for manual review.';
   } catch (error: any) {
     console.error('[PDF Parse Error]', error?.message || error);
-    return `PDF uploaded (parsing note: ${error?.message || 'extraction limited'}). Resume stored.`;
+    return `PDF uploaded (parsing error: ${error?.message || 'Unknown error'}). Resume stored.`;
   }
 };
 
