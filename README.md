@@ -148,8 +148,8 @@ AI          POST   /api/ai/:jobId/screen
 
 | Component | Platform | Link |
 |-----------|----------|------|
-| Frontend | Vercel | [Deploy](https://vercel.com) |
-| Backend | Railway/Render | [Deploy](https://railway.app) |
+| Frontend | Vercel | https://ai-recruitment-system-for-umurava-a-mu.vercel.app|
+| Backend | Railway/Render | https://ai-recruitmentsystem-backend.onrender.com|
 | Database | MongoDB Atlas | [Setup](https://mongodb.com/atlas) |
 
 **Environment Variables**:
