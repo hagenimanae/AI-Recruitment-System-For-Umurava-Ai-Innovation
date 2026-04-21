@@ -449,9 +449,16 @@ export const applyForJob = async (req: Request, res: Response): Promise<void> =>
 
     console.log('[Apply] Sanitized talentProfile:', JSON.stringify(talentProfile, null, 2));
 
-    // Ensure required fields are present
-    if (!talentProfile.firstName || !talentProfile.email) {
-      res.status(400).json({ message: 'First name and email are required' });
+    // Ensure ALL required fields are present
+    const requiredFields = ['firstName', 'lastName', 'email', 'headline', 'location'];
+    const missingFields = requiredFields.filter(field => !talentProfile[field as keyof typeof talentProfile]);
+    
+    if (missingFields.length > 0) {
+      console.log('[Apply] ERROR: Missing required fields:', missingFields);
+      res.status(400).json({ 
+        message: `Missing required fields: ${missingFields.join(', ')}`,
+        missingFields 
+      });
       return;
     }
 
@@ -464,7 +471,19 @@ export const applyForJob = async (req: Request, res: Response): Promise<void> =>
 
     console.log('[Apply] Creating applicant with data:', JSON.stringify(applicantData, null, 2));
 
-    const applicant = await Applicant.create(applicantData);
+    let applicant;
+    try {
+      applicant = await Applicant.create(applicantData);
+    } catch (dbError: any) {
+      console.error('[Apply] Database error:', dbError);
+      console.error('[Apply] Validation errors:', dbError.errors);
+      res.status(400).json({ 
+        message: 'Database validation failed', 
+        error: dbError.message,
+        validationErrors: dbError.errors 
+      });
+      return;
+    }
 
     res.status(201).json({ message: 'Application submitted successfully', applicant });
   } catch (error: any) {
