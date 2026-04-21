@@ -1,6 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import { uploadApplicant, getApplicantsByJobId, bulkUploadApplicants, deleteApplicant, applyForJob, getMyApplications, getAllApplicants } from '../controllers/applicantController';
+import { recruiterOrAdmin } from '../middleware/auth';
 
 const router = express.Router();
 
@@ -27,8 +28,8 @@ router.route('/:jobId/bulk')
 router.route('/single/:applicantId')
   .delete(deleteApplicant);
 
-// Recruiter applies for a job
+// Recruiter applies for a job - allow both recruiters and admins
 router.route('/:jobId/apply')
-  .post(applyForJob);
+  .post(recruiterOrAdmin, applyForJob);
 
 export default router;
