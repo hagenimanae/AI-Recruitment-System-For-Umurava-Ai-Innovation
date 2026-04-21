@@ -360,15 +360,15 @@ export const deleteApplicant = async (req: Request, res: Response): Promise<void
   }
 };
 
-// Recruiter applies for a job
+// Recruiter applies for a job - FIXED: Uses authenticated user's name/email from DB
 export const applyForJob = async (req: Request, res: Response): Promise<void> => {
   try {
     const { jobId } = req.params;
-    let userId = (req as any).user?.userId; // From auth middleware
+    const userId = (req as any).user?.userId; // From auth middleware
     
+    console.log('[Apply] ===== STARTING APPLICATION =====');
     console.log('[Apply] JobId:', jobId);
-    console.log('[Apply] User from req:', (req as any).user);
-    console.log('[Apply] UserId:', userId);
+    console.log('[Apply] UserId from JWT:', userId);
     
     if (!userId) {
       console.log('[Apply] ERROR: No userId found in request');
@@ -386,10 +386,28 @@ export const applyForJob = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    // Convert userId to ObjectId if it's a string
-    if (typeof userId === 'string' && isValidObjectId(userId)) {
-      userId = new mongoose.Types.ObjectId(userId);
+    // Convert userId to ObjectId
+    const userObjectId = isValidObjectId(userId) ? new mongoose.Types.ObjectId(userId) : userId;
+
+    // Fetch the user from database to get their stored name and email
+    const User = require('../models/User').default;
+    const user = await User.findById(userObjectId).select('+name email');
+    
+    if (!user) {
+      console.log('[Apply] ERROR: User not found in database for ID:', userId);
+      res.status(404).json({ message: 'User not found in database' });
+      return;
     }
+    
+    console.log('[Apply] Found user:', { name: user.name, email: user.email });
+
+    // Split user's name into first and last name
+    const nameParts = (user.name || '').split(' ').filter((n: string) => n.trim());
+    const firstName = nameParts[0] || 'Unknown';
+    const lastName = nameParts.slice(1).join(' ') || 'Candidate';
+    const email = user.email || 'no-email@example.com';
+    
+    console.log('[Apply] Extracted from user:', { firstName, lastName, email });
 
     const job = await Job.findById(jobIdStr);
     if (!job) {
@@ -398,15 +416,15 @@ export const applyForJob = async (req: Request, res: Response): Promise<void> =>
     }
 
     // Check if user already applied
-    const existingApplication = await Applicant.findOne({ jobId: jobIdStr, userId });
+    const existingApplication = await Applicant.findOne({ jobId: jobIdStr, userId: userObjectId });
     if (existingApplication) {
       res.status(400).json({ message: 'You have already applied for this job' });
       return;
     }
 
-    // Support both old and new schema formats
-    const body = req.body;
-    console.log('[Apply] Request body:', JSON.stringify(body, null, 2));
+    // Get optional data from request body (frontend can send these but they're not required)
+    const body = req.body || {};
+    console.log('[Apply] Optional body data:', JSON.stringify(body, null, 2));
     
     // Sanitize experience data - remove entries missing required fields
     const sanitizeExperience = (exp: any[]) => {
@@ -448,20 +466,21 @@ export const applyForJob = async (req: Request, res: Response): Promise<void> =>
         }));
     };
     
-    // Map to Talent Profile Schema - ensure ALL required fields have defaults
-    const firstName = body.firstName?.trim() || body.name?.split(' ')[0]?.trim() || 'Unknown';
-    const lastName = body.lastName?.trim() || body.name?.split(' ').slice(1).join(' ')?.trim() || 'Candidate';
-    const email = body.email?.trim() || 'no-email@example.com';
-    const headline = body.headline?.trim() || 'Professional';
+    // Use user's stored data as primary source, allow frontend to provide additional optional data
+    const headline = body.headline?.trim() || `${firstName} ${lastName}`;
     const location = body.location?.trim() || 'Remote';
     
-    // Build complete talent profile with guaranteed required fields
-    const talentProfile = {
+    // Build complete talent profile with GUARANTEED required fields from DB user
+    const applicantData = {
+      jobId: jobIdStr,
+      userId: userObjectId,
+      // REQUIRED fields from authenticated user (always present)
       firstName,
       lastName,
       email,
       headline,
       location,
+      // Optional fields from request body
       phone: body.phone?.trim() || '',
       bio: body.bio?.trim() || body.resumeText?.trim() || '',
       skills: sanitizeSkills(body.skills),
@@ -471,48 +490,12 @@ export const applyForJob = async (req: Request, res: Response): Promise<void> =>
       certifications: [],
       projects: [],
       availability: { status: 'Available', type: 'Full-time' },
-      socialLinks: {}
-    };
-
-    console.log('[Apply] Sanitized talentProfile:', JSON.stringify(talentProfile, null, 2));
-    console.log('[Apply] Extracted values:', { firstName, lastName, email, headline, location });
-
-    // Ensure ALL required fields are present and not empty
-    const fieldValues = { firstName, lastName, email, headline, location };
-    const missingFields = Object.entries(fieldValues)
-      .filter(([key, value]) => !value || value.trim() === '' || value === 'Unknown' || value === 'Candidate')
-      .map(([key]) => key);
-    
-    if (missingFields.length > 0) {
-      console.log('[Apply] ERROR: Missing required fields:', missingFields);
-      console.log('[Apply] Field values:', fieldValues);
-      res.status(400).json({ 
-        message: `Missing required fields: ${missingFields.join(', ')}`,
-        missingFields,
-        receivedBody: body 
-      });
-      return;
-    }
-
-    const applicantData = {
-      jobId: jobIdStr,
-      userId,
-      firstName,
-      lastName,
-      email,
-      headline,
-      location,
-      phone: talentProfile.phone,
-      bio: talentProfile.bio,
-      skills: talentProfile.skills,
-      languages: talentProfile.languages,
-      experience: talentProfile.experience,
-      education: talentProfile.education,
-      certifications: talentProfile.certifications,
-      projects: talentProfile.projects,
-      availability: talentProfile.availability,
-      socialLinks: talentProfile.socialLinks,
+      socialLinks: {},
+      // Store original body data
       structuredData: body,
+      // These will be auto-generated by pre-save hooks
+      name: `${firstName} ${lastName}`,
+      resumeText: body.resumeText?.trim() || ''
     };
 
     console.log('[Apply] Creating applicant with data:', JSON.stringify(applicantData, null, 2));
@@ -520,8 +503,10 @@ export const applyForJob = async (req: Request, res: Response): Promise<void> =>
     let applicant;
     try {
       applicant = await Applicant.create(applicantData);
+      console.log('[Apply] ===== SUCCESS: Application created =====');
     } catch (dbError: any) {
-      console.error('[Apply] Database error:', dbError);
+      console.error('[Apply] ===== DATABASE ERROR =====');
+      console.error('[Apply] Error:', dbError.message);
       console.error('[Apply] Validation errors:', dbError.errors);
       res.status(400).json({ 
         message: 'Database validation failed', 
@@ -533,8 +518,10 @@ export const applyForJob = async (req: Request, res: Response): Promise<void> =>
 
     res.status(201).json({ message: 'Application submitted successfully', applicant });
   } catch (error: any) {
-    console.error('[Apply] Server error:', error);
-    res.status(500).json({ message: 'Failed to submit application', error: error.message, stack: error.stack });
+    console.error('[Apply] ===== SERVER ERROR =====');
+    console.error('[Apply] Error:', error.message);
+    console.error('[Apply] Stack:', error.stack);
+    res.status(500).json({ message: 'Failed to submit application', error: error.message });
   }
 };
 
