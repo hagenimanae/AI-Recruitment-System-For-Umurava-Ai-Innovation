@@ -7,7 +7,7 @@ AI-recruit This Is AI-recruitment system which screen and shortlist candidate ba
 ## Overview
 End-to-end recruitment platform that automatically screens and shortlists candidates using Google's Gemini AI. Built for the Umurava AI Innovation Challenge.
 
-**Live Demo**: [https://ai-recruitment-system-for-umurava-a.vercel.app/]  | [https://ai-recruitment-system-for-umurava-ai.onrender.com/]
+**Live Demo**: [ai-recruitment-system-for-umurava-a-mu.vercel.app]  | [https://ai-recruitment-system-for-umurava-ai.onrender.com/]
 
 ---
 
