@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useRouter, usePathname } from 'next/navigation';
 import { RootState, AppDispatch } from '@/store';
-import { initializeAuth, logout } from '@/store/slices/authSlice';
+import { initializeAuth, logout, initAuthInterceptors } from '@/store/slices/authSlice';
 import Link from 'next/link';
 import { Home, Briefcase, Users, LogOut, Bell, Search, Cpu, CheckSquare, Menu, X } from 'lucide-react';
 import ThemeToggle from '@/components/ThemeToggle';
@@ -25,6 +25,8 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
   useEffect(() => {
     setMounted(true);
     dispatch(initializeAuth());
+    // Initialize axios interceptors for handling 401 errors
+    initAuthInterceptors(dispatch);
   }, [dispatch]);
 
   useEffect(() => {

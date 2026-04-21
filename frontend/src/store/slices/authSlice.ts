@@ -10,6 +10,41 @@ const getApiBaseUrl = (): string => {
 
 const API_URL = getApiBaseUrl();
 
+// Setup axios interceptor to handle 401 errors globally
+let logoutCallback: (() => void) | null = null;
+
+export const setLogoutCallback = (callback: () => void) => {
+  logoutCallback = callback;
+};
+
+// Axios interceptor to handle 401 errors globally
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      const errorCode = error.response?.data?.error;
+      const message = error.response?.data?.message || '';
+      
+      // Token expired or invalid - clear storage and logout
+      if (errorCode === 'TokenExpired' || errorCode === 'TokenInvalid' || message.includes('Session')) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.setItem('sessionExpired', 'true');
+        
+        if (logoutCallback) {
+          logoutCallback();
+        }
+        
+        // Redirect to login page if not already there
+        if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+          window.location.href = '/login';
+        }
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 interface User {
   id: string;
   name: string;
@@ -86,8 +121,20 @@ export const register = createAsyncThunk(
 export const logout = createAsyncThunk('auth/logout', async () => {
   localStorage.removeItem('token');
   localStorage.removeItem('user');
+  localStorage.removeItem('sessionExpired');
   return null;
 });
+
+// Check if session expired flag is set
+export const checkSessionExpired = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const expired = localStorage.getItem('sessionExpired');
+  if (expired) {
+    localStorage.removeItem('sessionExpired');
+    return true;
+  }
+  return false;
+};
 
 const authSlice = createSlice({
   name: 'auth',
@@ -154,3 +201,10 @@ const authSlice = createSlice({
 
 export const { initializeAuth, clearError } = authSlice.actions;
 export default authSlice.reducer;
+
+// Initialize logout callback for axios interceptor
+export const initAuthInterceptors = (dispatch: any) => {
+  setLogoutCallback(() => {
+    dispatch(logout());
+  });
+};

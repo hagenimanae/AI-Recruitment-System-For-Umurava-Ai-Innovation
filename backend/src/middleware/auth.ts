@@ -48,9 +48,20 @@ export const protect = async (
       req.user = decoded;
       next();
     } catch (err: any) {
+      // Check if token expired
+      if (err.name === 'TokenExpiredError') {
+        res.status(401).json({
+          message: 'Session expired. Please login again.',
+          error: 'TokenExpired',
+          expiredAt: err.expiredAt
+        });
+        return;
+      }
+      // Invalid token (tampered, wrong secret, etc.)
       res.status(401).json({
-        message: 'Token invalid',
-        error: err.message,
+        message: 'Session invalid. Please login again.',
+        error: 'TokenInvalid',
+        details: err.message
       });
     }
   } catch (err: any) {
