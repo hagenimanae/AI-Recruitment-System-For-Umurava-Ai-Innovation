@@ -448,15 +448,22 @@ export const applyForJob = async (req: Request, res: Response): Promise<void> =>
         }));
     };
     
-    // Map to Talent Profile Schema
-    const talentProfile = mapToTalentProfile(body) || {
-      firstName: body.firstName || body.name?.split(' ')[0] || 'Unknown',
-      lastName: body.lastName || body.name?.split(' ').slice(1).join(' ') || 'Candidate',
-      email: body.email || 'no-email@example.com',
-      headline: body.headline || 'Professional',
-      location: body.location || 'Remote',
-      phone: body.phone || '',
-      bio: body.bio || body.resumeText || '',
+    // Map to Talent Profile Schema - ensure ALL required fields have defaults
+    const firstName = body.firstName?.trim() || body.name?.split(' ')[0]?.trim() || 'Unknown';
+    const lastName = body.lastName?.trim() || body.name?.split(' ').slice(1).join(' ')?.trim() || 'Candidate';
+    const email = body.email?.trim() || 'no-email@example.com';
+    const headline = body.headline?.trim() || 'Professional';
+    const location = body.location?.trim() || 'Remote';
+    
+    // Build complete talent profile with guaranteed required fields
+    const talentProfile = {
+      firstName,
+      lastName,
+      email,
+      headline,
+      location,
+      phone: body.phone?.trim() || '',
+      bio: body.bio?.trim() || body.resumeText?.trim() || '',
       skills: sanitizeSkills(body.skills),
       languages: [],
       experience: sanitizeExperience(body.experience),
@@ -468,16 +475,21 @@ export const applyForJob = async (req: Request, res: Response): Promise<void> =>
     };
 
     console.log('[Apply] Sanitized talentProfile:', JSON.stringify(talentProfile, null, 2));
+    console.log('[Apply] Extracted values:', { firstName, lastName, email, headline, location });
 
-    // Ensure ALL required fields are present
-    const requiredFields = ['firstName', 'lastName', 'email', 'headline', 'location'];
-    const missingFields = requiredFields.filter(field => !talentProfile[field as keyof typeof talentProfile]);
+    // Ensure ALL required fields are present and not empty
+    const fieldValues = { firstName, lastName, email, headline, location };
+    const missingFields = Object.entries(fieldValues)
+      .filter(([key, value]) => !value || value.trim() === '' || value === 'Unknown' || value === 'Candidate')
+      .map(([key]) => key);
     
     if (missingFields.length > 0) {
       console.log('[Apply] ERROR: Missing required fields:', missingFields);
+      console.log('[Apply] Field values:', fieldValues);
       res.status(400).json({ 
         message: `Missing required fields: ${missingFields.join(', ')}`,
-        missingFields 
+        missingFields,
+        receivedBody: body 
       });
       return;
     }
@@ -485,7 +497,21 @@ export const applyForJob = async (req: Request, res: Response): Promise<void> =>
     const applicantData = {
       jobId: jobIdStr,
       userId,
-      ...talentProfile,
+      firstName,
+      lastName,
+      email,
+      headline,
+      location,
+      phone: talentProfile.phone,
+      bio: talentProfile.bio,
+      skills: talentProfile.skills,
+      languages: talentProfile.languages,
+      experience: talentProfile.experience,
+      education: talentProfile.education,
+      certifications: talentProfile.certifications,
+      projects: talentProfile.projects,
+      availability: talentProfile.availability,
+      socialLinks: talentProfile.socialLinks,
       structuredData: body,
     };
 

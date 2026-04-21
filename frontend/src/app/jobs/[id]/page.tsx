@@ -341,6 +341,9 @@ export default function JobDetails({ params }: { params: Promise<{ id: string }>
       resumeText: applicantForm.resumeText
     };
 
+    console.log('[Apply] Token being sent:', token ? token.substring(0, 20) + '...' : 'NONE');
+    console.log('[Apply] Request URL:', `${API_URL}/applicants/${resolvedParams.id}/apply`);
+    
     try {
       const response = await axios.post(
         `${API_URL}/applicants/${resolvedParams.id}/apply`,
@@ -365,7 +368,9 @@ export default function JobDetails({ params }: { params: Promise<{ id: string }>
       dispatch(fetchApplicants(resolvedParams.id));
     } catch (err: any) {
       console.error('[Apply] Error:', err);
-      alert(err.response?.data?.message || 'Failed to submit application');
+      console.error('[Apply] Error response:', err.response?.data);
+      console.error('[Apply] Error status:', err.response?.status);
+      alert(err.response?.data?.message || err.response?.data?.error || 'Failed to submit application');
     }
   };
 

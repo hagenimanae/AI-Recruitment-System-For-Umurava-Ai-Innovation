@@ -15,9 +15,17 @@ export const protect = async (req: AuthRequest, res: Response, next: NextFunctio
   try {
     let token;
 
+    // Debug logging
+    console.log('[Auth] Request path:', req.path);
+    console.log('[Auth] Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('[Auth] Authorization header:', req.headers.authorization);
+
     // Check for token in Authorization header
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
       token = req.headers.authorization.split(' ')[1];
+      console.log('[Auth] Token extracted:', token ? token.substring(0, 20) + '...' : 'none');
+    } else {
+      console.log('[Auth] No Bearer token found in Authorization header');
     }
 
     if (!token) {
