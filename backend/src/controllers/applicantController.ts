@@ -5,6 +5,11 @@ import Job from '../models/Job';
 import { Readable } from 'stream';
 import multer from 'multer';
 
+// Helper to check if string is valid ObjectId
+const isValidObjectId = (id: string): boolean => {
+  return mongoose.Types.ObjectId.isValid(id);
+};
+
 // Import pdf-parse properly
 const pdfParse = require('pdf-parse');
 const csvParser = require('csv-parser');
@@ -359,7 +364,7 @@ export const deleteApplicant = async (req: Request, res: Response): Promise<void
 export const applyForJob = async (req: Request, res: Response): Promise<void> => {
   try {
     const { jobId } = req.params;
-    const userId = (req as any).user?.userId; // From auth middleware
+    let userId = (req as any).user?.userId; // From auth middleware
     
     console.log('[Apply] JobId:', jobId);
     console.log('[Apply] User from req:', (req as any).user);
@@ -371,14 +376,29 @@ export const applyForJob = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    const job = await Job.findById(jobId);
+    // Ensure jobId is a string (req.params can return string | string[])
+    const jobIdStr = Array.isArray(jobId) ? jobId[0] : jobId;
+    
+    // Validate jobId format
+    if (!isValidObjectId(jobIdStr)) {
+      console.log('[Apply] ERROR: Invalid jobId format:', jobIdStr);
+      res.status(400).json({ message: 'Invalid job ID format' });
+      return;
+    }
+
+    // Convert userId to ObjectId if it's a string
+    if (typeof userId === 'string' && isValidObjectId(userId)) {
+      userId = new mongoose.Types.ObjectId(userId);
+    }
+
+    const job = await Job.findById(jobIdStr);
     if (!job) {
       res.status(404).json({ message: 'Job not found' });
       return;
     }
 
     // Check if user already applied
-    const existingApplication = await Applicant.findOne({ jobId, userId });
+    const existingApplication = await Applicant.findOne({ jobId: jobIdStr, userId });
     if (existingApplication) {
       res.status(400).json({ message: 'You have already applied for this job' });
       return;
@@ -463,7 +483,7 @@ export const applyForJob = async (req: Request, res: Response): Promise<void> =>
     }
 
     const applicantData = {
-      jobId,
+      jobId: jobIdStr,
       userId,
       ...talentProfile,
       structuredData: body,
