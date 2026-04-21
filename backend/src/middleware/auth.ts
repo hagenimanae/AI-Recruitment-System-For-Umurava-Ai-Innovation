@@ -17,19 +17,24 @@ export const protect = async (req: AuthRequest, res: Response, next: NextFunctio
 
     // Debug logging
     console.log('[Auth] Request path:', req.path);
-    console.log('[Auth] Headers:', JSON.stringify(req.headers, null, 2));
-    console.log('[Auth] Authorization header:', req.headers.authorization);
+    console.log('[Auth] Method:', req.method);
+    console.log('[Auth] Origin:', req.headers.origin);
+    
+    // Check for token in Authorization header (case-insensitive)
+    // Handle both string and string[] cases from headers
+    const rawAuthHeader = req.headers.authorization || req.headers.Authorization;
+    const authHeader = Array.isArray(rawAuthHeader) ? rawAuthHeader[0] : rawAuthHeader;
+    console.log('[Auth] Authorization header:', authHeader);
 
-    // Check for token in Authorization header
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-      token = req.headers.authorization.split(' ')[1];
+    if (authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer')) {
+      token = authHeader.split(' ')[1];
       console.log('[Auth] Token extracted:', token ? token.substring(0, 20) + '...' : 'none');
     } else {
-      console.log('[Auth] No Bearer token found in Authorization header');
+      console.log('[Auth] No Bearer token found');
     }
 
     if (!token) {
-      res.status(401).json({ message: 'Not authorized, no token' });
+      res.status(401).json({ message: 'Not authorized, no token', hint: 'Make sure to include Authorization: Bearer <token> header' });
       return;
     }
 
