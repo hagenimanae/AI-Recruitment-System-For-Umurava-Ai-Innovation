@@ -201,20 +201,33 @@ const ApplicantSchema: Schema = new Schema({
   // 3.8 Social Links
   socialLinks: { type: SocialLinksSchema, default: {} },
   
-  // Legacy fields (computed/virtual)
-  name: { type: String },
+  // Legacy fields (computed/virtual) - NOT required, auto-generated
+  name: { type: String, required: false },
   resumeText: { type: String, default: '' },
   structuredData: { type: Schema.Types.Mixed }
 }, {
   timestamps: true
 });
 
+// Pre-validate hook to generate name BEFORE validation
+ApplicantSchema.pre('validate', function() {
+  const applicant = this as unknown as IApplicant;
+  
+  // Generate full name from firstName and lastName
+  if (applicant.firstName && applicant.lastName) {
+    applicant.name = `${applicant.firstName} ${applicant.lastName}`;
+  } else if (!applicant.name) {
+    // Fallback if firstName/lastName not provided
+    applicant.name = applicant.firstName || applicant.lastName || 'Unknown Candidate';
+  }
+});
+
 // Pre-save hook to generate name and resumeText from structured data
 ApplicantSchema.pre('save', function() {
   const applicant = this as unknown as IApplicant;
   
-  // Generate full name
-  if (applicant.firstName && applicant.lastName) {
+  // Ensure name is set (in case pre-validate didn't run)
+  if (!applicant.name && applicant.firstName && applicant.lastName) {
     applicant.name = `${applicant.firstName} ${applicant.lastName}`;
   }
   
