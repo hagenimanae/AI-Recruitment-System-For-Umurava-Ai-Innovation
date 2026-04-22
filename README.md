@@ -7,8 +7,10 @@ AI-recruit This Is AI-recruitment system which screen and shortlist candidate ba
 ## Overview
 End-to-end recruitment platform that automatically screens and shortlists candidates using Google's Gemini AI. Built for the Umurava AI Innovation Challenge.
 
-**Live Demo**: [https://ai-recruitment-system-for-umurava-a-mu.vercel.app/]  | [https://ai-recruitment-system-for-umurava-ai.onrender.com/]
+**Live Demo**: [https://ai-recruitment-system-for-umurava-a-mu.vercel.app/]  | [https://ai-recruitment-system-for-umurava-ai.onrender.com/] expected output(cannot get means backend is running)
 
+Logins as admin to create job and add applicant and also add ai screening
+Logins as recruit to view available job and apply for that available job and see ai screening result through my applicant
 ---
 
 ## Architecture
@@ -148,8 +150,8 @@ AI          POST   /api/ai/:jobId/screen
 
 | Component | Platform | Link |
 |-----------|----------|------|
-| Frontend | Vercel | [vercel]|
-| Backend | Railway/Render | [rander]|
+| Frontend | Vercel | [https://vercel.com/]|
+| Backend | Railway/Render | [https://render.com/]|
 | Database | MongoDB Atlas | [Setup](https://mongodb.com/atlas) |
 
 **Environment Variables**:
