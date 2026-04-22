@@ -10,7 +10,7 @@ End-to-end recruitment platform that automatically screens and shortlists candid
 **Live Demo**: [https://ai-recruitment-system-for-umurava-a-mu.vercel.app/]  | [https://ai-recruitment-system-for-umurava-ai.onrender.com/] expected output(cannot get means backend is running)
 
 Logins as admin to create job and add applicant and also add ai screening
-Logins as recruit to view available job and apply for that available job and see ai screening result through my applicant
+Logins as recruit to view available job and apply for that available job and see ai screening result through my applicant  
 ---
 
 ## Architecture
