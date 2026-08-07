@@ -1,5 +1,5 @@
  HEAD
-# AI-Recruitment-System-For-Umurava-Ai-Innovation
+# NaskAI-Recruitment-System
 AI-recruit This Is AI-recruitment system which screen and shortlist candidate based on AI-Screening using real Gemin api key And It explain why candidate choosen
 
 # AI-Powered Recruitment System
@@ -182,15 +182,7 @@ Built with required 3+ roles:
 
 ---
 
-## Submission Checklist
 
-- ✅ Deployed web application
-- ✅ Functional AI-powered screening
-- ✅ Recruiter-facing interface
-- ✅ 2-slide presentation
-- ✅ Technical documentation (this README)
 
----
-
-**Built for the Umurava  AI Innovation Challenge  hackton by Quantum coder Lead By HAGENIMANA ELISSA**
+**Built for Nask  lab AI Innovation  By HAGENIMANA ELISSA**
 3594dc5 (first commit)
